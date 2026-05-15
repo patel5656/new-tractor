@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2E7D32;
+  --color-accent: #FF9800;
+  --color-earth-main: #FFFFFF;
+  --color-earth-card: #FFFFFF;
+  --color-earth-card-alt: #F9FAFB;
+  --color-earth-dark: #1A2218;
+  --color-earth-primary: #2E7D32;
+  --color-earth-primary-hover: #1B5E20;
+  --color-earth-brown: #1A2218;
+  --color-earth-green: #2E7D32;
+  --color-earth-green-dark: #1B5E20;
+  --color-earth-sub: #4B5563;
+  --color-earth-mut: #9CA3AF;
+  --color-earth-accent: #FF9800;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-earth-main text-earth-brown font-sans antialiased;
+    overscroll-behavior-y: none;
+  }
+  
+  html {
+    overscroll-behavior-y: none;
+  }
+  /* Global Interactive Feedback */
+  .cursor-pointer:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+}
+
+@layer utilities {
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .soft-shadow {
+    box-shadow: 0 4px 30px -2px rgba(0, 0, 0, 0.05);
+  }
+  .glass-card {
+    @apply bg-earth-card shadow-lg border-1 border-earth-dark/10;
+  }
+  /* Custom Scrollbar for premium feel */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  /* Utility to hide standard scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE, Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
