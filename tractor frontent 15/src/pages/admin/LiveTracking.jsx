@@ -5,6 +5,8 @@ import L from 'leaflet';
 import { api } from '../../lib/api';
 import 'leaflet/dist/leaflet.css';
 import API_BASE_URL from '../../config/api';
+import { BrainCircuit } from 'lucide-react';
+import AIHeatmapLayer from '../../components/admin/ai/AIHeatmapLayer';
 
 const SOCKET_URL = API_BASE_URL;
 const OPENFREE_TILES = 'https://tiles.openfreemap.org/styles/liberty/{z}/{x}/{y}.png';
@@ -84,6 +86,7 @@ export default function LiveTracking() {
   const [tileUrl, setTileUrl] = useState(OPENFREE_TILES);
   const [loading, setLoading] = useState(true);
   const [deviceLocation, setDeviceLocation] = useState(null);
+  const [showAI, setShowAI] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -208,6 +211,12 @@ export default function LiveTracking() {
           </p>
         </div>
         <div className="flex gap-2">
+            <button 
+               onClick={() => setShowAI(!showAI)}
+               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${showAI ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-earth-card text-earth-mut border-earth-dark/10'}`}
+            >
+               <BrainCircuit size={12} className={showAI ? "animate-pulse" : ""} /> AI Demand Map
+            </button>
             <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">
                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div> Link Active
             </span>
@@ -230,6 +239,8 @@ export default function LiveTracking() {
               },
             }}
           />
+          
+          <AIHeatmapLayer show={showAI} />
           
           <FitBounds markers={allMarkers} />
           <RecenterMap center={deviceLocation} />

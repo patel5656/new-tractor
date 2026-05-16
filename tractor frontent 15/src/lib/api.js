@@ -229,6 +229,9 @@ export const api = {
     getActiveJobs: async () => {
       return await fetchAPI('/admin/dashboard/active-jobs');
     },
+    getDemandForecast: async () => {
+      return await fetchAPI('/admin/ai/forecast');
+    },
     listBookings: async (params = {}) => {
       const query = new URLSearchParams(params).toString();
       return await fetchAPI(`/admin/bookings?${query}`);

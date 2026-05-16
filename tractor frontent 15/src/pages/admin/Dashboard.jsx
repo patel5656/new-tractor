@@ -17,6 +17,7 @@ import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import { formatCurrency } from '../../lib/format';
 import API_BASE_URL from '../../config/api';
+import AIForecastWidget from '../../components/admin/ai/AIForecastWidget';
 
 const SOCKET_URL = API_BASE_URL;
 const DEFAULT_CENTER = { lat: 30.900965, lng: 75.857277 };
@@ -232,6 +233,7 @@ export default function Dashboard() {
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-earth-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute top-1/2 -left-20 w-64 h-64 bg-earth-accent/5 blur-[120px] rounded-full pointer-events-none"></div>
 
+      <AIForecastWidget />
       
       {/* Metric Cards */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">

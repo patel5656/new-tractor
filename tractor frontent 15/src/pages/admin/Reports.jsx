@@ -6,6 +6,8 @@ import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import AIForecastChart from '../../components/admin/ai/AIForecastChart';
+import AIForecastWidget from '../../components/admin/ai/AIForecastWidget';
 
 // --- Improved Custom SVG Chart Components ---
 
@@ -138,7 +140,11 @@ export default function Reports() {
 
   const downloadPDF = async () => {
     try {
-      const res = await api.admin.reports.getExportData(range);
+      const [res, aiRes] = await Promise.all([
+        api.admin.reports.getExportData(range),
+        api.admin.getDemandForecast()
+      ]);
+
       if (!res.success) throw new Error("Export failed");
       
       const doc = new jsPDF();
@@ -148,13 +154,37 @@ export default function Reports() {
       doc.text(`Time Range: ${range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : '1 Year'}`, 14, 30);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 35);
 
+      // AI Insights Section
+      if (aiRes.success && aiRes.data) {
+        doc.setFontSize(14);
+        doc.setTextColor(147, 51, 234); // Purple color for AI
+        doc.text("AI Smart Insights & Forecast", 14, 50);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(40);
+        doc.text(`- Prediction: ${aiRes.data.insight}`, 14, 58);
+        doc.text(`- Predicted Peak Zone: ${aiRes.data.topZone}`, 14, 64);
+        doc.text(`- Top Predicted Service: ${aiRes.data.topService}`, 14, 70);
+
+        // AI Forecast Table
+        autoTable(doc, {
+          startY: 75,
+          head: [['Date', 'Predicted Bookings (Demand)']],
+          body: aiRes.data.forecast.map(f => [new Date(f.date).toLocaleDateString(), f.predictedBookings]),
+          styles: { fontSize: 8 },
+          headStyles: { fillStyle: [147, 51, 234], textColor: 255 },
+          margin: { top: 10 }
+        });
+      }
+
       // Bookings Table
+      const bookingsStartY = aiRes.success ? (doc).lastAutoTable.finalY + 15 : 50;
       doc.setFontSize(14);
       doc.setTextColor(40);
-      doc.text("Bookings Summary", 14, 50);
+      doc.text("Bookings Summary", 14, bookingsStartY);
       
       autoTable(doc, {
-        startY: 55,
+        startY: bookingsStartY + 5,
         head: [['ID', 'Farmer', 'Service', 'Price', 'Status', 'Date']],
         body: res.data.bookings.map(b => [
           b.id, 
@@ -271,6 +301,12 @@ export default function Reports() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* AI Forecasting Full Width */}
+      <div className="w-full space-y-4">
+        <AIForecastWidget />
+        <AIForecastChart />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

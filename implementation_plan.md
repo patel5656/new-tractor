@@ -1,0 +1,79 @@
+# AI Demand Forecasting Integration Plan
+
+This document outlines the step-by-step plan to integrate the AI Demand Forecasting feature into the Tractor Software without breaking the existing flow. As requested, we will strictly focus on adding the AI features to the Dashboard, Map (Live Tracking), and Reports, without altering any other existing functionalities.
+
+## User Review Required
+
+> [!IMPORTANT]
+> Please review this plan. This is a **Non-Blocking Modular Architecture**, meaning if the AI service ever fails or takes time to load, your core app (booking, login, etc.) will continue to work perfectly. 
+> 
+> **Do you approve of this approach? Once you say "Yes", I will start coding step-by-step.**
+
+## Open Questions
+
+> [!TIP]
+> 1. For the AI Model in the backend, instead of setting up a complex external Python server immediately, I propose writing a smart Node.js algorithm (Heuristic/Statistical forecasting) that analyzes your Prisma `Booking` history to predict trends. This is faster to implement and deploy right now. Is this acceptable for the initial version?
+
+## Proposed Changes
+
+---
+
+### Backend (Node.js/Prisma)
+
+We will create a completely independent API route and service for AI so that existing routes are 100% safe.
+
+#### [NEW] `src/services/ai.service.js`
+- Create a service that reads historical data from the `Booking` Prisma model.
+- Analyzes past dates, zones, and services to generate a 30-day demand forecast.
+
+#### [NEW] `src/controllers/admin/ai.controller.js`
+- Create an endpoint `getDemandForecast` that calls the AI service and formats the data for the frontend.
+
+#### [NEW] `src/routes/ai.routes.js`
+- Create a new route `GET /api/ai/forecast`.
+
+#### [MODIFY] `src/index.js`
+- Register the new route: `app.use('/api/ai', aiRoutes)`.
+
+---
+
+### Frontend Components (React)
+
+We will build independent UI widgets that can simply be dropped into the existing pages.
+
+#### [NEW] `src/components/admin/ai/AIForecastWidget.jsx`
+- A clean, modern alert card showing immediate AI insights (e.g., "Demand rising by 40% in Zone A").
+
+#### [NEW] `src/components/admin/ai/AIForecastChart.jsx`
+- A beautiful line graph (using Recharts) comparing past bookings with predicted future bookings.
+
+#### [NEW] `src/components/admin/ai/AIHeatmapLayer.jsx`
+- A map overlay component to visually highlight high-demand zones on the live map.
+
+---
+
+### Frontend Pages Integration
+
+We will insert our new components into the existing pages carefully.
+
+#### [MODIFY] `src/pages/admin/Dashboard.jsx`
+- Insert `<AIForecastWidget />` at the top of the dashboard.
+
+#### [MODIFY] `src/pages/admin/Reports.jsx`
+- Add a new tab or section at the top/bottom for "AI Forecasting" and insert `<AIForecastChart />`.
+
+#### [MODIFY] `src/pages/admin/LiveTracking.jsx` (Map)
+- Add a toggle button "Show AI Demand Heatmap" and integrate `<AIHeatmapLayer />`.
+
+## Verification Plan
+
+### Automated Tests
+- Test the new `GET /api/ai/forecast` endpoint using standard HTTP requests to ensure it returns valid JSON predictions without throwing errors.
+
+### Manual Verification
+- Start both `npm run dev` servers.
+- Log in to the Admin Panel.
+- Verify the Dashboard shows the new AI insight card at the top.
+- Verify the Reports page displays the future prediction graph.
+- Verify the Live Tracking map has a toggle that works without crashing the map.
+- Verify that standard bookings and tractor dispatches still function perfectly.
