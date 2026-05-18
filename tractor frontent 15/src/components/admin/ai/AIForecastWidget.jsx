@@ -44,28 +44,28 @@ export default function AIForecastWidget() {
     <Card className="bg-gradient-to-r from-earth-dark to-earth-brown border-none shadow-[0_10px_30px_rgba(0,0,0,0.15)] mb-6 overflow-hidden relative group">
       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
       
-      <CardContent className="p-5 md:p-6 relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <CardContent className="p-5 md:p-6 relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
           <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-earth-primary shadow-inner shrink-0 group-hover:scale-110 transition-transform">
             <BrainCircuit size={24} className="animate-pulse" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-earth-primary/80 mb-1 flex items-center gap-2">
                Smart AI Insights <TrendingUp size={12} />
             </h3>
-            <p className="text-sm md:text-base font-bold text-white leading-tight">
+            <p className="text-sm md:text-base font-bold text-white leading-tight truncate md:whitespace-normal">
               {data.insight}
             </p>
           </div>
         </div>
         
-        <div className="flex gap-3 w-full md:w-auto mt-2 md:mt-0">
-           <div className="bg-white/10 backdrop-blur border border-white/10 px-4 py-2 rounded-xl flex-1 md:flex-none">
-              <p className="text-[9px] uppercase tracking-widest text-earth-primary/70 font-black mb-0.5">Predicted Peak Zone</p>
+        <div className="flex gap-3 w-full lg:w-auto shrink-0 flex-wrap sm:flex-nowrap">
+           <div className="bg-white/10 backdrop-blur border border-white/10 px-4 py-2 rounded-xl flex-1 sm:flex-none min-w-[140px]">
+              <p className="text-[9px] uppercase tracking-widest text-earth-primary/70 font-black mb-0.5 whitespace-nowrap">Predicted Peak Zone</p>
               <p className="text-white font-bold flex items-center gap-1.5"><MapPin size={12} className="text-earth-primary" /> {data.topZone}</p>
            </div>
-           <div className="bg-white/10 backdrop-blur border border-white/10 px-4 py-2 rounded-xl flex-1 md:flex-none">
-              <p className="text-[9px] uppercase tracking-widest text-earth-primary/70 font-black mb-0.5">Top Service</p>
+           <div className="bg-white/10 backdrop-blur border border-white/10 px-4 py-2 rounded-xl flex-1 sm:flex-none min-w-[140px]">
+              <p className="text-[9px] uppercase tracking-widest text-earth-primary/70 font-black mb-0.5 whitespace-nowrap">Top Service</p>
               <p className="text-white font-bold flex items-center gap-1.5"><AlertCircle size={12} className="text-earth-primary" /> {data.topService}</p>
            </div>
         </div>

@@ -11,9 +11,17 @@ import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import requestRoutes from './routes/request.routes.js';
 import ussdRoutes from './routes/ussd.routes.js';
+import loanRoutes from './routes/loan.routes.js';
 import { sendError } from './utils/response.js';
 
 dotenv.config();
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRASH] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err, origin) => {
+  console.error('[CRASH] Uncaught Exception:', err, 'origin:', origin);
+});
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,6 +68,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/request', requestRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/ussd', ussdRoutes);
+app.use('/api/loans', loanRoutes);
 
 // Root Route
 app.get('/', (req, res) => {
@@ -173,3 +182,4 @@ io.on('connection', (socket) => {
 httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+// Nodemon trigger reload to bind port 5000 successfully

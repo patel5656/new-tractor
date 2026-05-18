@@ -13,12 +13,12 @@ export default function Settings() {
   const location = useLocation();
   const navigate = useNavigate();
   const { 
-    generalInfo, fuelMetrics, zones, serviceRates, maintenanceSettings, systemServices,
-    updateGeneral, updateFuelPrice, refreshZones, refreshServices, updateServiceRates, updateService, updateMaintenance, updatePricingMode 
+    generalInfo, fuelMetrics, zones, serviceRates, maintenanceSettings, systemServices, loanSettings,
+    updateGeneral, updateFuelPrice, refreshZones, refreshServices, updateServiceRates, updateService, updateMaintenance, updatePricingMode, updateLoanSettings 
   } = useSettings();
 
   const tabFromPath = location.pathname.split('/').pop();
-  const validTabs = ['pricing', 'fuel', 'zones', 'rates', 'maintenance', 'ussd'];
+  const validTabs = ['pricing', 'fuel', 'zones', 'rates', 'maintenance', 'ussd', 'loans'];
   const activeTab = validTabs.includes(tabFromPath) ? tabFromPath : 'general';
 
   const [localGeneral, setLocalGeneral] = useState(generalInfo);
@@ -40,6 +40,12 @@ export default function Settings() {
   
   const [localRates, setLocalRates] = useState(serviceRates);
   const [localMaintenance, setLocalMaintenance] = useState(maintenanceSettings);
+  const [localLoans, setLocalLoans] = useState(loanSettings || {
+    loanFeatureEnabled: false,
+    loanActiveBank: "MOCK",
+    loanMaxAmount: 100000,
+    loanMinBookingValue: 50000
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
 
@@ -106,6 +112,10 @@ export default function Settings() {
     }
   }, [saveStatus]);
 
+  useEffect(() => {
+    if (loanSettings) setLocalLoans(loanSettings);
+  }, [loanSettings]);
+
   const tabs = [
     { id: 'general', label: 'General Info', icon: SettingsIcon },
     { id: 'pricing', label: 'Pricing Settings', icon: Calculator },
@@ -114,6 +124,7 @@ export default function Settings() {
     { id: 'ussd', label: 'USSD Locations', icon: Zap },
     { id: 'rates', label: 'Service Rates', icon: Banknote },
     { id: 'maintenance', label: 'Maintenance Hub', icon: Wrench },
+    { id: 'loans', label: 'Loan Integration', icon: ShieldCheck },
   ];
 
   const handleTabChange = (tabId) => {
@@ -142,6 +153,7 @@ export default function Settings() {
       if (activeTab === 'fuel') await updateFuelPrice(localFuel.dieselPrice, localFuel.avgMileage, localPricingMode);
       if (activeTab === 'rates') await updateServiceRates(localRates);
       if (activeTab === 'maintenance') await updateMaintenance(localMaintenance);
+      if (activeTab === 'loans') await updateLoanSettings(localLoans);
       
       setSaveStatus('success');
     } catch (e) {
@@ -1562,6 +1574,91 @@ export default function Settings() {
                         <p className="text-xs font-black text-earth-brown uppercase italic tracking-tight">Critical Monitoring</p>
                         <p className="text-[10px] font-bold text-earth-mut uppercase tracking-widest leading-relaxed">
                           The system will flag units for mandatory withdrawal from dispatch logic when the pre-alert threshold is reached.
+                        </p>
+                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Loan Integration Settings */}
+            {activeTab === 'loans' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-300">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black tracking-widest text-earth-sub pl-1">Loan Integration Feature</label>
+                    <div className="flex items-center gap-4 bg-earth-card border border-earth-dark/15 p-4 rounded-2xl shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => setLocalLoans({ ...localLoans, loanFeatureEnabled: !localLoans.loanFeatureEnabled })}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                          localLoans.loanFeatureEnabled ? "bg-green-600" : "bg-earth-dark/20"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                            localLoans.loanFeatureEnabled ? "translate-x-5" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                      <span className="text-sm font-black text-earth-brown uppercase tracking-wider">
+                        {localLoans.loanFeatureEnabled ? "Enabled (Active)" : "Disabled (Inactive)"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black tracking-widest text-earth-sub pl-1">Active Loan Provider Bank</label>
+                    <select
+                      value={localLoans.loanActiveBank}
+                      onChange={(e) => setLocalLoans({ ...localLoans, loanActiveBank: e.target.value })}
+                      className="w-full bg-earth-card border border-earth-dark/15 font-black text-sm text-earth-brown h-14 px-4 rounded-2xl focus:border-earth-primary shadow-inner focus:outline-none"
+                    >
+                      <option value="MOCK">MOCK BANK (Simulated Verification)</option>
+                      <option value="CROP2CASH">CROP2CASH API GATEWAY</option>
+                      <option value="BOI_SOFT_LOANS">BANK OF INDUSTRY (BOI)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black tracking-widest text-earth-sub pl-1">Maximum Loan limit</label>
+                    <div className="relative">
+                      <Input 
+                        type="number" 
+                        value={localLoans.loanMaxAmount} 
+                        onChange={(e) => setLocalLoans({ ...localLoans, loanMaxAmount: parseFloat(e.target.value) || 0 })}
+                        className="bg-earth-card border-earth-dark/15 font-black text-xl text-earth-brown h-14 rounded-2xl focus:border-earth-primary shadow-inner" 
+                      />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-earth-mut uppercase">₦</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black tracking-widest text-earth-sub pl-1">Minimum Booking Value for Loan</label>
+                    <div className="relative">
+                      <Input 
+                        type="number" 
+                        value={localLoans.loanMinBookingValue} 
+                        onChange={(e) => setLocalLoans({ ...localLoans, loanMinBookingValue: parseFloat(e.target.value) || 0 })}
+                        className="bg-earth-card border-earth-dark/15 font-black text-xl text-earth-brown h-14 rounded-2xl focus:border-earth-primary shadow-inner" 
+                      />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-earth-mut uppercase">₦</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="p-6 bg-earth-primary/5 rounded-3xl border border-earth-dark/10 h-full flex flex-col justify-center gap-4">
+                     <ShieldCheck size={32} className="text-earth-primary" />
+                     <div className="space-y-2">
+                        <p className="text-xs font-black text-earth-brown uppercase italic tracking-tight">Agricultural Soft Loan Facility</p>
+                        <p className="text-[10px] font-bold text-earth-mut uppercase tracking-widest leading-relaxed">
+                          Farmers can finance their tractor service payments on installment-based EMI schedules directly during checkout.
+                        </p>
+                        <p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest leading-relaxed border-t border-earth-dark/5 pt-2">
+                          Note: Sensitive keys are stored in the secure server-side environmental configurations (.env) for client security.
                         </p>
                      </div>
                   </div>

@@ -22,6 +22,7 @@ const FarmerHome = lazyWithRetry(() => import('./pages/farmer/Home'));
 const BookTractor = lazyWithRetry(() => import('./pages/farmer/BookTractor'));
 const TrackJob = lazyWithRetry(() => import('./pages/farmer/TrackJob'));
 const History = lazyWithRetry(() => import('./pages/farmer/History'));
+const Loans = lazyWithRetry(() => import('./pages/farmer/Loans'));
 const Payments = lazyWithRetry(() => import('./pages/farmer/Payments'));
 const Profile = lazyWithRetry(() => import('./pages/farmer/Profile'));
 
@@ -348,6 +349,7 @@ function App() {
                   <Route path="book" element={<BookTractor />} />
                   <Route path="track" element={<TrackJob />} />
                   <Route path="history" element={<History />} />
+                  <Route path="loans" element={<Loans />} />
                   <Route path="payments" element={<Payments />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>

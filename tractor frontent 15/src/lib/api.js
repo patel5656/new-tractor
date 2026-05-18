@@ -573,5 +573,17 @@ export const api = {
         method: 'DELETE'
       });
     }
+  },
+  loans: {
+    apply: async (loanData) => {
+      return await fetchAPI('/loans/apply', {
+        method: 'POST',
+        body: JSON.stringify(loanData),
+        retries: 2
+      });
+    },
+    getHistory: async () => {
+      return await fetchAPI('/loans/history');
+    }
   }
 };

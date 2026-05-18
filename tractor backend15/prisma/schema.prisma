@@ -26,6 +26,7 @@ model User {
   tractor          Tractor?       @relation("OperatorTractor")
   notifications    Notification[] @relation("UserNotifications")
   fuelLogsReviewed FuelLog[]      @relation("AdminFuelLogReviews")
+  loans            Loan[]         @relation("UserLoans")
 
   @@map("users")
 }
@@ -61,6 +62,10 @@ model SystemConfig {
   baseLongitude        Float?   @map("base_longitude")
   perKmRate            Float    @default(500) @map("per_km_rate")
   pricingMode          String   @default("ZONE") @map("pricing_mode")
+  loanFeatureEnabled   Boolean  @default(false) @map("loan_feature_enabled")
+  loanActiveBank       String   @default("MOCK") @map("loan_active_bank")
+  loanMaxAmount        Float    @default(100000) @map("loan_max_amount")
+  loanMinBookingValue  Float    @default(50000) @map("loan_min_booking_value")
 
   @@map("system_config")
 }
@@ -113,6 +118,7 @@ model Booking {
   service             Service   @relation(fields: [serviceId], references: [id])
   tractor             Tractor?  @relation("TractorBookings", fields: [tractorId], references: [id])
   payments            Payment[]
+  loan                Loan?
 
   @@index([farmerId], map: "bookings_farmer_id_fkey")
   @@index([operatorId], map: "bookings_operator_id_fkey")
@@ -208,3 +214,25 @@ model UssdLocation {
 
   @@map("ussd_locations")
 }
+
+model Loan {
+  id                  Int      @id @default(autoincrement())
+  bookingId           Int      @unique @map("booking_id")
+  farmerId            Int      @map("farmer_id")
+  amount              Float
+  provider            String   @default("MOCK")
+  status              String   @default("PENDING") // PENDING, APPROVED, REJECTED, PAID
+  bvnSnapshot         String?  @map("bvn_snapshot")
+  emiMonths           Int      @default(3) @map("emi_months")
+  emiAmount           Float    @map("emi_amount")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  booking             Booking  @relation(fields: [bookingId], references: [id])
+  farmer              User     @relation("UserLoans", fields: [farmerId], references: [id])
+
+  @@index([bookingId], map: "loans_booking_id_fkey")
+  @@index([farmerId], map: "loans_farmer_id_fkey")
+  @@map("loans")
+}
+

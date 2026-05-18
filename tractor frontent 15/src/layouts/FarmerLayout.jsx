@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Home, Tractor, MapPin, Clock, CreditCard, User, LogOut, Bell, ChevronRight, Menu, ListCollapse, CheckCircle2, AlertCircle, MessageSquare, X } from 'lucide-react';
+import { Home, Tractor, MapPin, Clock, CreditCard, User, LogOut, Bell, ChevronRight, Menu, ListCollapse, CheckCircle2, AlertCircle, MessageSquare, X, Landmark } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import NotificationDropdown from '../components/NotificationDropdown';
@@ -66,6 +66,7 @@ export default function FarmerLayout() {
     { icon: Tractor, label: t('book', 'Book'), path: '/farmer/book' },
     { icon: MapPin, label: t('track', 'Track'), path: '/farmer/track' },
     { icon: Clock, label: t('history', 'History'), path: '/farmer/history' },
+    { icon: Landmark, label: t('loans', 'Loans'), path: '/farmer/loans' },
     { icon: CreditCard, label: t('pay', 'Pay'), path: '/farmer/payments' },
     { icon: User, label: t('profile', 'Profile'), path: '/farmer/profile' },
   ];

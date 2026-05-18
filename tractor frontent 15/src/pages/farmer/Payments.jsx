@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useBookings } from '../../context/BookingContext';
+import { useSettings } from '../../context/SettingsContext';
 import { api } from '../../lib/api';
 import { Badge } from '../../components/ui/Badge';
 import { cn } from '../../lib/utils';
@@ -13,15 +14,82 @@ import useScrollLock from '../../hooks/useScrollLock';
 
 export default function Payments() {
   const { fetchBookings } = useBookings();
+  const { loanSettings } = useSettings();
   const location = useLocation();
   const [pendingData, setPendingData] = useState({ bookings: [], totalOutstanding: 0 });
   const [isLoading, setIsLoading] = useState(true);
   
   const [selectedTx, setSelectedTx] = useState(null);
   const [paymentPortal, setPaymentPortal] = useState({ open: false, type: '', amount: 0, targetId: null, bookingData: null });
-  const [paymentStep, setPaymentStep] = useState('method'); // method | success
+  const [paymentStep, setPaymentStep] = useState('method'); // method | bvn-verification | success
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
+
+  const [selectedMethod, setSelectedMethod] = useState('card'); // card | loan
+  const [bvn, setBvn] = useState('');
+  const [emiMonths, setEmiMonths] = useState(3);
+
+  // Reset payment states when payment portal resets/opens
+  useEffect(() => {
+    if (paymentPortal.open) {
+      setPaymentStep('method');
+      setSelectedMethod('card');
+      setBvn('');
+      setEmiMonths(3);
+      setPaymentError(null);
+    }
+  }, [paymentPortal.open]);
+
+  const isLoanFeatureActive = loanSettings?.loanFeatureEnabled ?? false;
+  const isMinQualified = paymentPortal.amount >= (loanSettings?.loanMinBookingValue ?? 50000);
+  const isMaxQualified = paymentPortal.amount <= (loanSettings?.loanMaxAmount ?? 100000);
+  const isLoanQualified = isLoanFeatureActive && isMinQualified && isMaxQualified;
+
+  const startLoanPayment = async () => {
+    try {
+      setIsPaying(true);
+      setPaymentError(null);
+
+      // Validate BVN
+      if (!/^\d{11}$/.test(bvn)) {
+        setPaymentError("Invalid BVN. It must be exactly 11 digits.");
+        setIsPaying(false);
+        return;
+      }
+
+      let bookingId = paymentPortal.targetId;
+
+      // 1. If it's a new booking, we must create the booking request first
+      if (bookingId === 'NEW_BOOKING') {
+        const res = await api.farmer.createBooking(paymentPortal.bookingData);
+        if (res.success) {
+          bookingId = res.data.id;
+        } else {
+          throw new Error(res.message || "Failed to create booking request.");
+        }
+      }
+
+      // 2. Call the new apply loan API
+      const loanRes = await api.loans.apply({
+        bookingId,
+        bvn,
+        emiMonths
+      });
+
+      if (loanRes.success) {
+        // Refresh states
+        await fetchPending();
+        await fetchBookings();
+        setPaymentStep('success');
+      } else {
+        throw new Error(loanRes.message || "Failed to approve soft loan.");
+      }
+    } catch (error) {
+      setPaymentError(error.message || "Something went wrong during loan application.");
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   // Lock background scroll when any modal is open
   useScrollLock(selectedTx || paymentPortal.open);
@@ -297,24 +365,192 @@ export default function Payments() {
                     </div>
                   </div>
 
+                  {/* Payment Method Selector */}
+                  {isLoanFeatureActive && (
+                    <div className="space-y-2 animate-in fade-in duration-300">
+                      <p className="text-[8px] font-black text-earth-mut uppercase tracking-widest pl-1">Select Payment Method</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMethod('card')}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all gap-1.5 focus:outline-none",
+                            selectedMethod === 'card'
+                              ? "bg-accent/5 border-accent text-accent"
+                              : "bg-earth-card border-earth-dark/10 text-earth-mut hover:border-earth-dark/20 hover:text-earth-brown"
+                          )}
+                        >
+                          <CreditCard size={18} />
+                          <span className="text-[9px] font-black uppercase tracking-wider">Paystack</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isLoanQualified) {
+                              setSelectedMethod('loan');
+                            }
+                          }}
+                          disabled={!isLoanQualified}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all gap-1.5 relative focus:outline-none",
+                            selectedMethod === 'loan'
+                              ? "bg-earth-primary/5 border-earth-primary text-earth-primary"
+                              : "bg-earth-card border-earth-dark/10 text-earth-mut hover:border-earth-dark/20 hover:text-earth-brown",
+                            !isLoanQualified && "opacity-40 cursor-not-allowed"
+                          )}
+                        >
+                          <ShieldCheck size={18} />
+                          <span className="text-[9px] font-black uppercase tracking-wider">Soft Loan</span>
+                          {!isLoanQualified && (
+                            <span className="absolute -top-1.5 px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-600 text-[6px] font-black uppercase tracking-widest scale-90">
+                              N/A
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isLoanQualified && isLoanFeatureActive && (
+                    <p className="text-[7.5px] font-black text-red-400 uppercase tracking-widest text-center leading-relaxed">
+                      Loan facility only applies for payments between {formatCurrency(loanSettings?.loanMinBookingValue ?? 50000)} and {formatCurrency(loanSettings?.loanMaxAmount ?? 100000)}.
+                    </p>
+                  )}
+
                   {/* Trust Section */}
-                  <div className="bg-earth-card/40 border border-earth-dark/10 rounded-xl px-4 py-3.5 flex items-start gap-3">
-                    <ShieldCheck size={16} className="text-earth-green/70 mt-0.5 shrink-0" />
+                  {selectedMethod === 'card' && (
+                    <div className="bg-earth-card/40 border border-earth-dark/10 rounded-xl px-4 py-3.5 flex items-start gap-3 animate-in fade-in duration-200">
+                      <ShieldCheck size={16} className="text-earth-green/70 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-[9px] font-black text-earth-brown uppercase tracking-wide">Secure Payment via Paystack</p>
+                        <p className="text-[8px] font-bold text-earth-mut uppercase tracking-widest mt-0.5">Supports Card / Bank Transfer / USSD</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedMethod === 'loan' && (
+                    <div className="bg-earth-primary/5 border border-earth-primary/10 rounded-xl px-4 py-3.5 flex items-start gap-3 animate-in fade-in duration-200">
+                      <ShieldCheck size={16} className="text-earth-primary mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-[9px] font-black text-earth-brown uppercase tracking-wide">Agricultural Soft Loan Facility</p>
+                        <p className="text-[8px] font-bold text-earth-mut uppercase tracking-widest mt-0.5">Select a 3 or 6-month flexible payment installment plan</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Button */}
+                  {selectedMethod === 'card' ? (
+                    <Button
+                      onClick={startPayment}
+                      isLoading={isPaying}
+                      loadingText="Processing..."
+                      className="w-full h-14 bg-accent text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-accent/20 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                      {!isPaying && <CreditCard size={18} />}
+                      Pay Now
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => setPaymentStep('bvn-verification')}
+                      className="w-full h-14 bg-earth-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-earth-primary/20 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                      Continue to Loan Approval
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {paymentStep === 'bvn-verification' && (
+                <div className="p-7 space-y-5 animate-in fade-in duration-300">
+                  {/* Header */}
+                  <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-[9px] font-black text-earth-brown uppercase tracking-wide">Secure Payment via Paystack</p>
-                      <p className="text-[8px] font-bold text-earth-mut uppercase tracking-widest mt-0.5">Supports Card / Bank Transfer / USSD</p>
+                       <h3 className="text-2xl font-black text-earth-brown italic leading-none">Loan Verification</h3>
+                       <p className="text-[8px] font-black text-earth-mut uppercase tracking-widest mt-2">Enter credentials and verify EMI schedules</p>
+                    </div>
+                    <button onClick={() => setPaymentStep('method')} className="text-earth-mut hover:text-earth-brown transition-colors"><X size={20} /></button>
+                  </div>
+
+                  {paymentError && (
+                    <div className="bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-xl text-red-500 text-[10px] font-black uppercase tracking-widest text-center animate-pulse">
+                      {paymentError}
+                    </div>
+                  )}
+
+                  {/* BVN Input */}
+                  <div className="space-y-2">
+                    <label className="text-[9px] uppercase font-black text-earth-sub pl-1">11-Digit Bank Verification Number (BVN)</label>
+                    <input
+                      type="text"
+                      maxLength={11}
+                      value={bvn}
+                      onChange={(e) => setBvn(e.target.value.replace(/\D/g, ''))}
+                      placeholder="e.g. 22233344455"
+                      className="w-full bg-earth-card border border-earth-dark/15 font-black text-lg text-earth-brown h-14 px-4 rounded-2xl focus:border-earth-primary shadow-inner tracking-widest text-center focus:outline-none"
+                    />
+                  </div>
+
+                  {/* EMI Schedule Calculator */}
+                  <div className="bg-earth-card/60 border border-earth-dark/10 rounded-2xl overflow-hidden p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[8px] font-black text-earth-mut uppercase tracking-widest">Financing Tenure</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEmiMonths(3)}
+                          className={cn(
+                            "px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all focus:outline-none",
+                            emiMonths === 3
+                              ? "bg-earth-primary text-white shadow-md shadow-earth-primary/10"
+                              : "bg-earth-card border border-earth-dark/10 text-earth-mut"
+                          )}
+                        >
+                          3 Months
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEmiMonths(6)}
+                          className={cn(
+                            "px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all focus:outline-none",
+                            emiMonths === 6
+                              ? "bg-earth-primary text-white shadow-md shadow-earth-primary/10"
+                              : "bg-earth-card border border-earth-dark/10 text-earth-mut"
+                          )}
+                        >
+                          6 Months
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="divide-y divide-earth-dark/5 space-y-2.5 pt-2.5">
+                      <div className="flex justify-between items-center text-[10px] font-black text-earth-mut uppercase tracking-widest pt-1.5">
+                        <span>Principal Amount</span>
+                        <span className="text-earth-brown font-black">{formatCurrency(paymentPortal.amount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-black text-earth-mut uppercase tracking-widest pt-2.5">
+                        <span>Interest (5% flat)</span>
+                        <span className="text-earth-brown font-black">{formatCurrency(paymentPortal.amount * 0.05)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-black text-earth-mut uppercase tracking-widest pt-2.5">
+                        <span>Total Payable</span>
+                        <span className="text-earth-brown font-black">{formatCurrency(paymentPortal.amount * 1.05)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-black text-earth-mut uppercase tracking-widest border-t border-earth-dark/10 pt-3">
+                        <span className="text-earth-primary">Monthly Installment</span>
+                        <span className="text-lg text-earth-primary font-black tabular-nums">{formatCurrency((paymentPortal.amount * 1.05) / emiMonths)}</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Single Pay Now Button */}
+                  {/* Submit Button */}
                   <Button
-                    onClick={startPayment}
+                    onClick={startLoanPayment}
                     isLoading={isPaying}
-                    loadingText="Processing..."
-                    className="w-full h-14 bg-accent text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-accent/20 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    loadingText="Approving Loan..."
+                    className="w-full h-14 bg-earth-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-earth-primary/20 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                   >
-                    {!isPaying && <CreditCard size={18} />}
-                    Pay Now
+                    Confirm Soft Loan & Book
                   </Button>
                 </div>
               )}

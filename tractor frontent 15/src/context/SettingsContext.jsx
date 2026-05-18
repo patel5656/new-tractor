@@ -31,6 +31,13 @@ export const SettingsProvider = ({ children }) => {
     preAlertHours: 50
   });
 
+  const [loanSettings, setLoanSettings] = useState({
+    loanFeatureEnabled: false,
+    loanActiveBank: "MOCK",
+    loanMaxAmount: 100000,
+    loanMinBookingValue: 50000
+  });
+
   const [zones, setZones] = useState([]);
   const [serviceRates, setServiceRates] = useState(initialRates);
   const [systemServices, setSystemServices] = useState([]);
@@ -43,7 +50,7 @@ export const SettingsProvider = ({ children }) => {
         : await api.farmer.getSystemConfig();
 
       if (configRes.success) {
-        const { hubName, hubLocation, supportEmail, contactEmail, dieselPrice, avgMileage, fuelCostPerKm, serviceIntervalHours, preAlertHours, updatedAt, baseLatitude, baseLongitude, perKmRate, pricingMode } = configRes.data;
+        const { hubName, hubLocation, supportEmail, contactEmail, dieselPrice, avgMileage, fuelCostPerKm, serviceIntervalHours, preAlertHours, updatedAt, baseLatitude, baseLongitude, perKmRate, pricingMode, loanFeatureEnabled, loanActiveBank, loanMaxAmount, loanMinBookingValue } = configRes.data;
         
         setGeneralInfo({ 
           hubName, hubLocation, supportEmail, contactEmail,
@@ -52,6 +59,12 @@ export const SettingsProvider = ({ children }) => {
         });
         setFuelMetrics({ dieselPrice, avgMileage, fuelCostPerKm, pricingMode: pricingMode || 'ZONE', lastUpdated: updatedAt });
         setMaintenanceSettings({ serviceIntervalHours, preAlertHours });
+        setLoanSettings({
+          loanFeatureEnabled: loanFeatureEnabled ?? false,
+          loanActiveBank: loanActiveBank ?? "MOCK",
+          loanMaxAmount: loanMaxAmount ?? 100000,
+          loanMinBookingValue: loanMinBookingValue ?? 50000
+        });
       }
     } catch (error) {
       console.error('Failed to fetch system config:', error);
@@ -199,6 +212,18 @@ export const SettingsProvider = ({ children }) => {
     }
   };
 
+  const updateLoanSettings = async (data) => {
+    try {
+      const res = await api.admin.updateSystemConfig(data);
+      if (res.success) {
+        setLoanSettings(prev => ({ ...prev, ...data }));
+      }
+      return res;
+    } catch (error) {
+       throw error;
+    }
+  };
+
   const value = {
     generalInfo,
     fuelMetrics,
@@ -206,6 +231,7 @@ export const SettingsProvider = ({ children }) => {
     serviceRates,
     systemServices,
     maintenanceSettings,
+    loanSettings,
     updateGeneral,
     updateFuelPrice,
     refreshZones,
@@ -213,7 +239,8 @@ export const SettingsProvider = ({ children }) => {
     updateServiceRates,
     updateService,
     updateMaintenance,
-    updatePricingMode
+    updatePricingMode,
+    updateLoanSettings
   };
 
   return (
