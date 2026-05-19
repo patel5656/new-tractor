@@ -164,10 +164,10 @@ async function getRoute(start, end) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
     const routeUrl = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson&steps=true`;
-    
+
     const response = await fetch(routeUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
-    
+
     if (!response.ok) throw new Error('Route service busy');
     const data = await response.json();
     const route = data?.routes?.[0];
@@ -201,7 +201,7 @@ export default function LiveTrackingMap({
   destinationLabel = '',
 }) {
   const { user } = useAuth();
-  
+
   const [operatorLocation, setOperatorLocation] = useState(null);
   const [farmerLocation, setFarmerLocation] = useState(null);
 
@@ -256,7 +256,7 @@ export default function LiveTrackingMap({
         lng: (operatorLocation.lng + farmerLocation.lng) / 2,
       };
     } else {
-      point = (role === 'operator') 
+      point = (role === 'operator')
         ? (operatorLocation || deviceLocation || farmerLocation || DEFAULT_CENTER)
         : (farmerLocation || operatorLocation || deviceLocation || DEFAULT_CENTER);
     }
@@ -269,7 +269,7 @@ export default function LiveTrackingMap({
     if (!navigator.geolocation) return;
 
     const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 };
-    
+
     const onSuccess = (pos) => {
       setDeviceLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     };
@@ -286,7 +286,7 @@ export default function LiveTrackingMap({
     };
 
     deviceWatchIdRef.current = navigator.geolocation.watchPosition(onSuccess, onError, options);
-    
+
     return () => {
       if (deviceWatchIdRef.current) navigator.geolocation.clearWatch(deviceWatchIdRef.current);
     };
@@ -354,7 +354,7 @@ export default function LiveTrackingMap({
 
   const animateOperator = useCallback((nextPoint) => {
     if (!nextPoint) return;
-    
+
     // If it's the first point, just set it
     if (!operatorLocationRef.current) {
       operatorLocationRef.current = nextPoint;
@@ -460,9 +460,9 @@ export default function LiveTrackingMap({
   // Immediate route update on first valid points or significant movement
   useEffect(() => {
     if (!operatorLocation || !farmerLocation) return;
-    
-    const distSinceLast = lastRoutePointRef.current 
-      ? getDistance(operatorLocation, lastRoutePointRef.current) 
+
+    const distSinceLast = lastRoutePointRef.current
+      ? getDistance(operatorLocation, lastRoutePointRef.current)
       : Infinity;
 
     // Trigger on first load or > 30m movement
@@ -555,7 +555,7 @@ export default function LiveTrackingMap({
   }, [emitFarmerDestination]);
 
   return (
-    <div 
+    <div
       className={cn("relative z-0 w-full flex flex-col overflow-hidden bg-neutral-100", className)}
       style={{ minHeight: '600px', height: '100%' }}
     >
@@ -592,16 +592,16 @@ export default function LiveTrackingMap({
               <p className="text-[6px] md:text-[7px] font-bold uppercase opacity-80 tracking-widest text-center mb-0.5 leading-none">Next Command</p>
               <p className="text-[10px] md:text-[11px] font-black text-center leading-tight uppercase tracking-tight">{instructions[0]}</p>
             </div>
-            
+
             <div className="space-y-1">
-              <button 
+              <button
                 onClick={() => setIsInstructionsExpanded(!isInstructionsExpanded)}
                 className="w-full flex justify-between items-center px-2 py-1 text-[7px] md:text-[8px] font-black text-neutral-400 uppercase tracking-widest hover:text-neutral-600 transition-colors"
               >
                 <span>Upcoming turns</span>
                 <span className="text-[6px]">{isInstructionsExpanded ? "Collapse" : "Expand"}</span>
               </button>
-              
+
               {isInstructionsExpanded && (
                 <div className="max-h-[80px] md:max-h-[120px] overflow-y-auto pr-1.5 scrollbar-hide animate-in fade-in slide-in-from-top-1 duration-200">
                   <ul className="space-y-1.5 py-1">
@@ -623,7 +623,7 @@ export default function LiveTrackingMap({
           onClick={() => setIsAutoFollow((prev) => !prev)}
           className={cn(
             "mt-2 md:mt-3 w-full h-8 rounded-xl border text-[8px] md:text-[9px] font-black uppercase tracking-widest transition-all active:scale-95",
-            isAutoFollow 
+            isAutoFollow
               ? "bg-neutral-900 text-white border-neutral-900 shadow-md md:shadow-lg shadow-neutral-200"
               : "bg-white text-neutral-800 border-neutral-200 hover:bg-neutral-50"
           )}
@@ -632,14 +632,14 @@ export default function LiveTrackingMap({
         </button>
       </div>
 
-      <MapContainer 
-        center={center} 
-        zoom={13} 
+      <MapContainer
+        center={center}
+        zoom={13}
         className="w-full flex-1"
         style={{ height: '600px', minHeight: '600px' }}
       >
-        <TileLayer 
-          url={tileUrl} 
+        <TileLayer
+          url={tileUrl}
           eventHandlers={{
             tileerror: () => {
               // Only fallback once to avoid infinite update loops
@@ -656,9 +656,9 @@ export default function LiveTrackingMap({
 
         {deviceLocation && (
           <Marker position={[deviceLocation.lat, deviceLocation.lng]}>
-             <Popup>
-                <div className="text-[10px] font-black uppercase">You are here</div>
-             </Popup>
+            <Popup>
+              <div className="text-[10px] font-black uppercase">You are here</div>
+            </Popup>
           </Marker>
         )}
 
@@ -675,13 +675,13 @@ export default function LiveTrackingMap({
 
         {route.length > 1 && (
           <>
-            <MemoizedPolyline 
-              positions={route} 
-              pathOptions={{ color: '#2563eb', weight: 8, opacity: 0.4 }} 
+            <MemoizedPolyline
+              positions={route}
+              pathOptions={{ color: '#2563eb', weight: 8, opacity: 0.4 }}
             />
-            <MemoizedPolyline 
-              positions={route} 
-              pathOptions={{ color: '#3b82f6', weight: 4, opacity: 1, lineJoin: 'round' }} 
+            <MemoizedPolyline
+              positions={route}
+              pathOptions={{ color: '#3b82f6', weight: 4, opacity: 1, lineJoin: 'round' }}
             />
           </>
         )}

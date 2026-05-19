@@ -1,14 +1,12 @@
-import { useState, useEffect, Fragment, useMemo } from 'react';
+import { useState, useEffect, Fragment, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   Users, Tractor, Banknote, Navigation, ArrowUpRight, ArrowDownRight, 
   Activity, Clock, MapPin, CheckCircle, AlertCircle, Fuel, Battery,
   MoreVertical, ShieldCheck, Zap
 } from 'lucide-react';
-import { MapContainer, Marker, TileLayer, Popup, useMap, Polyline } from 'react-leaflet';
-import L from 'leaflet';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, Polyline } from '@react-google-maps/api';
 import { io } from 'socket.io-client';
-import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -21,59 +19,45 @@ import AIForecastWidget from '../../components/admin/ai/AIForecastWidget';
 
 const SOCKET_URL = API_BASE_URL;
 const DEFAULT_CENTER = { lat: 30.900965, lng: 75.857277 };
-const OPENFREE_TILES = 'https://tiles.openfreemap.org/styles/liberty/{z}/{x}/{y}.png';
-const OSM_FALLBACK_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-const farmerPinIcon = L.divIcon({
-  html: '<div style="background:#dc2626;color:white;border-radius:9999px;padding:4px 6px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.2)">📍</div>',
-  className: '',
-  iconSize: [20, 24],
-  iconAnchor: [10, 22],
-});
-
-function FitBounds({ markers }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!markers || markers.length === 0) return;
-    const bounds = L.latLngBounds(markers.map(m => [m.lat, m.lng]));
-    map.fitBounds(bounds, { padding: [20, 20] });
-  }, [markers, map]);
-  return null;
-}
-
-function DashboardMapAutoCenter({ center }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center) map.setView([center.lat, center.lng]);
-  }, [center, map]);
-  return null;
-}
 
 const getRoute = async (start, end) => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-    const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-    
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    
-    if (!res.ok) throw new Error('Route service busy');
-    const data = await res.json();
-    const route = data?.routes?.[0];
-    if (!route) throw new Error('No route available');
-
-    return route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-  } catch (error) {
-    return [[start.lat, start.lng], [end.lat, end.lng]];
-  }
+  if (!window.google) return [{ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }];
+  return new Promise((resolve) => {
+    const ds = new window.google.maps.DirectionsService();
+    ds.route(
+      {
+        origin: { lat: start.lat, lng: start.lng },
+        destination: { lat: end.lat, lng: end.lng },
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      },
+      (response, status) => {
+        if (status === 'OK') {
+          const route = response.routes[0];
+          const coordinates = route.overview_path.map((p) => ({
+            lat: p.lat(),
+            lng: p.lng(),
+          }));
+          resolve(coordinates);
+        } else {
+          resolve([{ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }]);
+        }
+      }
+    );
+  });
 };
+
+const LIBRARIES = ['places'];
 
 export default function Dashboard() {
   const { t } = useTranslation();
   const [assignmentStatus, setAssignmentStatus] = useState(null);
   
-  // Dashboard state variables mapped to backend
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: LIBRARIES
+  });
+
   const [metrics, setMetrics] = useState({ active_jobs: 0, pending_assignment: 0, fleet_ready: 0, total_revenue: 0 });
   const [assignmentQueue, setAssignmentQueue] = useState([]);
   const [revenueChart, setRevenueChart] = useState({ labels: [], data: [] });
@@ -86,7 +70,17 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isChartLoading, setIsChartLoading] = useState(false);
   const [deviceLocation, setDeviceLocation] = useState(null);
-  const [tileUrl, setTileUrl] = useState(OSM_FALLBACK_TILES);
+  const [activePopup, setActivePopup] = useState(null); // { type, jobId, extra }
+
+  const mapRef = useRef(null);
+
+  const onLoad = useCallback((map) => {
+    mapRef.current = map;
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    mapRef.current = null;
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -114,7 +108,6 @@ export default function Dashboard() {
     };
     fetchDashboardData();
 
-    // Socket for live fleet updates
     const socket = io(SOCKET_URL, { 
       transports: ['websocket'],
       reconnection: true
@@ -168,12 +161,10 @@ export default function Dashboard() {
     fetchRevenueData();
   }, [timeframe]);
 
-  // Update routes when jobs or first operator locations arrive
   useEffect(() => {
     let isCancelled = false;
     
     const fetchAllRoutes = async () => {
-      // Find jobs that need a route update (have operator location but no route yet)
       const jobsToFetch = activeJobs.filter(job => {
         const hasOpLoc = !!fleetLocations[job.operatorId];
         const hasDest = Number.isFinite(job.farmerLatitude);
@@ -187,7 +178,6 @@ export default function Dashboard() {
         if (isCancelled) break;
         
         const opLoc = fleetLocations[job.operatorId];
-        // Delay to respect OSRM public API rate limits (1 per second recommended for free tier)
         await new Promise(r => setTimeout(r, 1000));
         if (isCancelled) break;
         
@@ -200,7 +190,7 @@ export default function Dashboard() {
 
     fetchAllRoutes();
     return () => { isCancelled = true; };
-  }, [activeJobs, fleetLocations, jobRoutes]); // Added jobRoutes back but used jobsToFetch filter to prevent loop cycles
+  }, [activeJobs, fleetLocations, jobRoutes]);
   
   const stats = [
     { title: t('activeJobs', 'Active Jobs'), value: metrics.active_jobs, icon: Activity, trend: '+2', up: true },
@@ -227,22 +217,31 @@ export default function Dashboard() {
     return points;
   }, [deviceLocation, fleetLocations, activeJobs]);
 
+  useEffect(() => {
+    if (mapRef.current && mapMarkers.length > 0) {
+      const bounds = new window.google.maps.LatLngBounds();
+      mapMarkers.forEach((m) => {
+        if (m && Number.isFinite(m.lat) && Number.isFinite(m.lng)) {
+          bounds.extend(m);
+        }
+      });
+      mapRef.current.fitBounds(bounds);
+    }
+  }, [mapMarkers]);
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-10 relative">
-      {/* Subtle Background Elements */}
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-earth-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute top-1/2 -left-20 w-64 h-64 bg-earth-accent/5 blur-[120px] rounded-full pointer-events-none"></div>
 
       <AIForecastWidget />
       
-      {/* Metric Cards */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, i) => (
           <Card key={i} className={cn(
             "relative border-none overflow-hidden transition-all duration-300 hover:shadow-xl",
             stat.highlight ? "bg-white shadow-[0_10px_40px_rgba(234,179,8,0.12)] border-earth-accent/20 border" : "bg-white shadow-sm border border-earth-dark/5"
           )}>
-            {/* Top Accent Bar */}
             <div className={cn("absolute top-0 left-0 w-full h-1 md:h-1.5", 
               i === 0 ? "bg-blue-500" : i === 1 ? "bg-earth-accent" : i === 2 ? "bg-earth-green" : "bg-earth-green-dark"
             )}></div>
@@ -299,7 +298,6 @@ export default function Dashboard() {
               </Badge>
             </CardHeader>
             <CardContent className="p-0">
-               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-earth-dark text-white">
@@ -402,36 +400,34 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Revenue Chart Refinement */}
+          {/* Revenue Chart */}
           <Card className="bg-earth-card-alt shadow-lg rounded-[1.5rem] overflow-hidden">
              <div className="p-6 flex justify-between items-center bg-earth-card/30">
                 <h3 className="text-sm font-black text-earth-brown uppercase tracking-widest">{t('revenueAnalytics', 'Revenue Analytics')}</h3>
                 <div className="flex gap-2">
                    {['Daily', 'Weekly', 'Monthly'].map(tStr => {
-                     const isActive = tStr.toLowerCase() === timeframe;
-                     return (
-                        <button 
-                          key={tStr} 
-                          onClick={() => setTimeframe(tStr.toLowerCase())}
-                          className={cn("text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-md transition-all shadow-sm", isActive ? "bg-earth-primary text-earth-brown shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-105" : "bg-earth-card text-earth-mut hover:text-earth-brown hover:shadow-md")}
-                        >
-                         {t(tStr.toLowerCase(), tStr)}
-                       </button>
-                     );
+                      const isActive = tStr.toLowerCase() === timeframe;
+                      return (
+                         <button 
+                           key={tStr} 
+                           onClick={() => setTimeframe(tStr.toLowerCase())}
+                           className={cn("text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-md transition-all shadow-sm", isActive ? "bg-earth-primary text-earth-brown shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-105" : "bg-earth-card text-earth-mut hover:text-earth-brown hover:shadow-md")}
+                         >
+                          {t(tStr.toLowerCase(), tStr)}
+                        </button>
+                      );
                    })}
                 </div>
              </div>
              <div className="p-6 h-64 relative bg-earth-card/20 flex items-end justify-around gap-2">
                 <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(to right, #404040 1px, transparent 1px), linear-gradient(to bottom, #404040 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
                 
-                {/* Dynamic Bar Chart Implementation based on API Data */}
                 {revenueChart?.labels?.map((label, index) => {
                   const val = revenueChart.data[index] || 0;
                   const heightPercentage = Math.min(Math.max((val / chartMax) * 100, 8), 100);
 
                   return (
                     <div key={index} className="flex flex-col items-center justify-end h-full z-10 w-full max-w-[42px] group relative">
-                      {/* Tooltip on hover */}
                       <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                         <div className="bg-earth-dark text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-2xl whitespace-nowrap">
                           {formatCurrency(val)}
@@ -449,7 +445,6 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
-                {/* Empty State mapping */}
                 {isChartLoading ? (
                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-earth-mut gap-2">
                       <Clock className="animate-spin text-earth-primary" size={14} /> {t('loadingData', 'Loading Data...')}
@@ -478,99 +473,142 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="p-0 flex-1 flex flex-col">
-              <div className="relative z-0 h-[300px] bg-earth-main relative border-b border-earth-dark/10 shrink-0 group overflow-hidden">
-                 <MapContainer 
-                  center={DEFAULT_CENTER} 
-                  zoom={10} 
-                  className="w-full h-full"
-                  zoomControl={false}
-                  attributionControl={false}
-                  style={{ height: '300px', minHeight: '300px' }}
-                >
-                   <TileLayer 
-                    url={tileUrl}
-                    eventHandlers={{
-                      tileerror: () => {
-                        if (tileUrl !== OSM_FALLBACK_TILES) setTileUrl(OSM_FALLBACK_TILES);
-                      }
+              <div className="relative z-0 h-[300px] bg-earth-main border-b border-earth-dark/10 shrink-0 group overflow-hidden">
+                {isLoaded ? (
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '300px' }}
+                    center={DEFAULT_CENTER}
+                    zoom={10}
+                    onLoad={onLoad}
+                    onUnmount={onUnmount}
+                    options={{
+                      streetViewControl: false,
+                      mapTypeControl: false,
+                      fullscreenControl: false,
+                      zoomControl: false,
                     }}
-                  />
-                   
-                   <DashboardMapAutoCenter center={deviceLocation} />
-                   <FitBounds markers={mapMarkers} />
+                  >
+                    {deviceLocation && (
+                      <MarkerF
+                        position={deviceLocation}
+                        icon={window.google ? {
+                          url: 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="8" fill="%232563eb" stroke="white" stroke-width="2"/></svg>',
+                          scaledSize: new window.google.maps.Size(16, 16),
+                          anchor: new window.google.maps.Point(8, 8),
+                        } : undefined}
+                        onClick={() => setActivePopup({ type: 'device', jobId: 'device' })}
+                      />
+                    )}
 
-                   {deviceLocation && (
-                    <Marker 
-                      position={[deviceLocation.lat, deviceLocation.lng]} 
-                      icon={L.divIcon({
-                        html: '<div style="background:#2563eb;color:white;border-radius:9999px;padding:5px;width:12px;height:12px;border:2px solid white;box-shadow:0 0 10px rgba(0,0,0,0.3)"></div>',
-                        className: '',
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10],
-                      })} 
-                    >
-                      <Popup><div className="text-[10px] font-black uppercase">{t('youAreHere', 'You are here')}</div></Popup>
-                    </Marker>
-                   )}
+                    {activePopup && activePopup.type === 'device' && deviceLocation && (
+                      <InfoWindowF
+                        position={deviceLocation}
+                        onCloseClick={() => setActivePopup(null)}
+                      >
+                        <div className="text-[10px] font-black uppercase">{t('youAreHere', 'You are here')}</div>
+                      </InfoWindowF>
+                    )}
 
-                   {fleetData.map((tItem) => {
-                     const loc = fleetLocations[tItem.operatorId];
-                     if (!loc) return null;
-                     
-                     // Find if this tractor is on a job
-                     const job = activeJobs.find(j => j.operatorId === tItem.operatorId);
-                     const route = job ? jobRoutes[job.id] : null;
-
-                     const tractorIcon = L.divIcon({
-                        html: `<div style="transform: rotate(${loc.heading || 0}deg); background:${tItem.status?.toLowerCase() === 'available' ? '#16a34a' : '#ea7b08'};color:#fff;border-radius:8px;padding:4px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.2)">🚜</div>`,
-                        className: '',
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12],
-                     });
+                    {fleetData.map((tItem) => {
+                      const loc = fleetLocations[tItem.operatorId];
+                      if (!loc) return null;
+                      
+                      const job = activeJobs.find(j => j.operatorId === tItem.operatorId);
+                      const route = job ? jobRoutes[job.id] : null;
 
                       return (
                         <Fragment key={tItem.id}>
-                          <Marker position={[loc.lat, loc.lng]} icon={tractorIcon}>
-                             <Popup>
-                                <div className="text-[10px] space-y-1">
-                                   <p className="font-black uppercase text-earth-mut">Unit #T-{tItem.id}</p>
-                                   <p className="font-bold text-earth-brown">{tItem.operator_name}</p>
-                                   {job && <p className="text-[9px] text-earth-primary font-bold">{t('headingTo', 'Heading to')}: {job.farmerName}</p>}
-                                </div>
-                             </Popup>
-                          </Marker>
-                          
-                          {/* Render Farmer Target for this job */}
+                          <MarkerF
+                            position={{ lat: loc.lat, lng: loc.lng }}
+                            icon={window.google ? {
+                              path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                              scale: 4,
+                              fillColor: tItem.status?.toLowerCase() === 'available' ? '#16a34a' : '#ea7b08',
+                              fillOpacity: 1,
+                              strokeColor: '#ffffff',
+                              strokeWeight: 1.5,
+                              rotation: loc.heading || 0,
+                            } : undefined}
+                            onClick={() => setActivePopup({ type: 'operator', jobId: tItem.id, extra: tItem })}
+                          />
+
+                          {activePopup && activePopup.type === 'operator' && activePopup.jobId === tItem.id && (
+                            <InfoWindowF
+                              position={{ lat: loc.lat, lng: loc.lng }}
+                              onCloseClick={() => setActivePopup(null)}
+                            >
+                              <div className="text-[10px] space-y-1">
+                                 <p className="font-black uppercase text-earth-mut">Unit #T-{tItem.id}</p>
+                                 <p className="font-bold text-earth-brown">{tItem.operator_name}</p>
+                                 {job && <p className="text-[9px] text-earth-primary font-bold">{t('headingTo', 'Heading to')}: {job.farmerName}</p>}
+                              </div>
+                            </InfoWindowF>
+                          )}
+
                           {job && Number.isFinite(job.farmerLatitude) && (
-                            <Marker position={[job.farmerLatitude, job.farmerLongitude]} icon={farmerPinIcon}>
-                              <Popup>
-                                <div className="text-[10px] space-y-1">
-                                   <p className="font-black uppercase text-earth-mut">{t('client', 'Client')}</p>
-                                   <p className="font-bold text-earth-brown">{job.farmerName}</p>
-                                   <p className="text-[9px] text-earth-sub">{t('task', 'Task')}: {job.serviceName}</p>
-                                </div>
-                              </Popup>
-                            </Marker>
+                            <MarkerF
+                              position={{ lat: job.farmerLatitude, lng: job.farmerLongitude }}
+                              icon={window.google ? {
+                                url: 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><text y="18" font-size="18">📍</text></svg>',
+                                scaledSize: new window.google.maps.Size(24, 24),
+                                anchor: new window.google.maps.Point(12, 22),
+                              } : undefined}
+                              onClick={() => setActivePopup({ type: 'farmer', jobId: job.id, extra: job })}
+                            />
+                          )}
+
+                          {activePopup && activePopup.type === 'farmer' && activePopup.jobId === job?.id && (
+                            <InfoWindowF
+                              position={{ lat: job.farmerLatitude, lng: job.farmerLongitude }}
+                              onCloseClick={() => setActivePopup(null)}
+                            >
+                              <div className="text-[10px] space-y-1">
+                                 <p className="font-black uppercase text-earth-mut">{t('client', 'Client')}</p>
+                                 <p className="font-bold text-earth-brown">{job.farmerName}</p>
+                                 <p className="text-[9px] text-earth-sub">{t('task', 'Task')}: {job.serviceName}</p>
+                              </div>
+                            </InfoWindowF>
                           )}
 
                           {route && route.length > 0 && (
-                            <Polyline 
-                              positions={route}
-                              pathOptions={{ color: '#16a34a', weight: 2, opacity: 0.7 }}
+                            <Polyline
+                              path={route}
+                              options={{ strokeColor: '#16a34a', strokeWeight: 2, strokeOpacity: 0.7 }}
                             />
                           )}
+
                           {job && !route && (
-                             <Polyline 
-                                positions={[[loc.lat, loc.lng], [job.farmerLatitude, job.farmerLongitude]]}
-                                pathOptions={{ color: '#dc2626', weight: 1, dashArray: '5, 5', opacity: 0.5 }}
-                             />
+                            <Polyline
+                              path={[
+                                { lat: loc.lat, lng: loc.lng },
+                                { lat: job.farmerLatitude, lng: job.farmerLongitude }
+                              ]}
+                              options={{
+                                strokeColor: '#dc2626',
+                                strokeWeight: 1,
+                                strokeOpacity: 0.5,
+                                icons: [{
+                                  icon: {
+                                    path: 'M 0,-1 0,1',
+                                    strokeOpacity: 1,
+                                    scale: 2
+                                  },
+                                  offset: '0',
+                                  repeat: '10px'
+                                }]
+                              }}
+                            />
                           )}
                         </Fragment>
                       );
-                   })}
-                </MapContainer>
+                    })}
+                  </GoogleMap>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-earth-main/50 text-[10px] font-black uppercase text-earth-mut">
+                    Loading Satellite View...
+                  </div>
+                )}
                 
-                {/* Fallback overlay if map is empty */}
                 {Object.keys(fleetLocations).length === 0 && !deviceLocation && (
                    <div className="absolute inset-0 bg-earth-main/50 backdrop-blur-[2px] z-[500] flex items-center justify-center pointer-events-none">
                       <p className="text-[9px] font-black uppercase tracking-[0.2em] text-earth-mut flex items-center gap-2">
@@ -596,7 +634,6 @@ export default function Dashboard() {
                   <div className="grid grid-cols-1 gap-4">
                     {fleetData.map((tItem, index) => (
                       <div key={index} className="p-5 rounded-[1.5rem] bg-white border border-earth-dark/[0.03] shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative">
-                        {/* Inner soft glow */}
                         <div className={cn("absolute top-0 right-0 w-32 h-32 blur-3xl opacity-10 rounded-full -mr-16 -mt-16 pointer-events-none", 
                           tItem.status?.toLowerCase() === 'available' ? 'bg-earth-green' : 'bg-earth-accent'
                         )}></div>
@@ -678,4 +715,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

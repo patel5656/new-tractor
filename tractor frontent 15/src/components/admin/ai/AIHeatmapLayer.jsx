@@ -1,28 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { Circle, Popup } from 'react-leaflet';
+import { CircleF, InfoWindowF } from '@react-google-maps/api';
 import { api } from '../../../lib/api';
 
-// Default center coordinates for the heatmap zone
 const DEFAULT_HEATMAP_CENTER = { lat: 30.900965, lng: 75.857277 };
 
 export default function AIHeatmapLayer({ show = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
-    // Reset data when hidden
     if (!show) {
       setData(null);
+      setInfoOpen(false);
       return;
     }
 
-    // Fetch AI forecast data when shown
     const fetchForecast = async () => {
       setLoading(true);
       try {
         const resData = await api.admin.getDemandForecast();
         if (resData.success) {
           setData(resData.data);
+          setInfoOpen(true); // Open info popup automatically on load
         }
       } catch (error) {
         console.error('AI Forecast fetch failed', error);
@@ -34,50 +34,61 @@ export default function AIHeatmapLayer({ show = false }) {
     fetchForecast();
   }, [show]);
 
-  // Don't render anything if hidden
   if (!show) return null;
 
-  // Use coordinates from data, otherwise fallback to default
   const heatmapCenter = (data && data.topZoneLat && data.topZoneLng) 
     ? { lat: data.topZoneLat, lng: data.topZoneLng }
     : DEFAULT_HEATMAP_CENTER;
 
   return (
     <>
-      {/* Outer large pulse circle - always visible when show=true */}
-      <Circle
+      <CircleF
         center={heatmapCenter}
         radius={20000}
-        pathOptions={{
+        options={{
           color: '#ef4444',
           fillColor: '#ef4444',
           fillOpacity: 0.08,
-          weight: 1,
-          dashArray: '6, 6',
+          strokeWeight: 1,
+          clickable: false
         }}
       />
 
-      {/* Main hotspot circle - always visible when show=true */}
-      <Circle
+      <CircleF
         center={heatmapCenter}
         radius={15000}
-        pathOptions={{
+        onClick={() => setInfoOpen(true)}
+        options={{
           color: '#ef4444',
           fillColor: '#ef4444',
           fillOpacity: 0.25,
-          weight: 2.5,
-          dashArray: '8, 6',
+          strokeWeight: 2,
         }}
-      >
-        <Popup>
+      />
+
+      <CircleF
+        center={heatmapCenter}
+        radius={5000}
+        options={{
+          color: '#ef4444',
+          fillColor: '#ef4444',
+          fillOpacity: 0.4,
+          strokeWeight: 0,
+          clickable: false
+        }}
+      />
+
+      {infoOpen && (
+        <InfoWindowF
+          position={heatmapCenter}
+          onCloseClick={() => setInfoOpen(false)}
+        >
           <div style={{ minWidth: '180px', padding: '8px', textAlign: 'center' }}>
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
               <div style={{
                 width: '10px', height: '10px', borderRadius: '50%',
                 backgroundColor: '#ef4444',
                 boxShadow: '0 0 0 3px rgba(239,68,68,0.3)',
-                animation: 'pulse 1.5s infinite'
               }} />
               <span style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6b7280' }}>
                 AI Predicted Hotspot
@@ -107,20 +118,9 @@ export default function AIHeatmapLayer({ show = false }) {
               <p style={{ fontSize: '11px', color: '#ef4444' }}>Could not load AI data. Check backend.</p>
             )}
           </div>
-        </Popup>
-      </Circle>
-
-      {/* Inner core circle */}
-      <Circle
-        center={heatmapCenter}
-        radius={5000}
-        pathOptions={{
-          color: '#ef4444',
-          fillColor: '#ef4444',
-          fillOpacity: 0.4,
-          weight: 0,
-        }}
-      />
+        </InfoWindowF>
+      )}
     </>
   );
 }
+
