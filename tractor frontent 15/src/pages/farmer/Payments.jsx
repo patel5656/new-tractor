@@ -11,10 +11,12 @@ import { Badge } from '../../components/ui/Badge';
 import { cn } from '../../lib/utils';
 import { formatCurrency } from '../../lib/format';
 import useScrollLock from '../../hooks/useScrollLock';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Payments() {
   const { fetchBookings } = useBookings();
   const { loanSettings } = useSettings();
+  const { user } = useAuth();
   const location = useLocation();
   const [pendingData, setPendingData] = useState({ bookings: [], totalOutstanding: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -159,26 +161,67 @@ export default function Payments() {
       setIsPaying(true);
       setPaymentError(null);
       
-      if (paymentPortal.targetId === 'NEW_BOOKING') {
-        // THIS IS THE NEW ATOMIC CHECKOUT FLOW
-        await api.farmer.checkout(paymentPortal.bookingData);
-      } else {
-        await api.payments.payBooking({
-          bookingId: paymentPortal.targetId,
-          amount: paymentPortal.amount,
-          method: 'card' // Default for now
-        });
+      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      if (!paystackKey) {
+        throw new Error("Paystack Public Key is not configured in .env.");
       }
-      
-      // Refresh both local and global booking state
-      await fetchPending();
-      await fetchBookings();
-      
-      setPaymentStep('success');
+
+      if (!window.PaystackPop) {
+        throw new Error("Paystack SDK failed to load. Please check your internet connection.");
+      }
+
+      const paymentEmail = user?.email || `${user?.phone || 'farmer'}@tractorlink.com`;
+
+      const handler = window.PaystackPop.setup({
+        key: paystackKey,
+        email: paymentEmail,
+        amount: Math.round(paymentPortal.amount * 100), // in kobo
+        currency: 'NGN',
+        metadata: {
+          bookingId: paymentPortal.targetId,
+          farmerId: user?.id,
+          bookingData: paymentPortal.targetId === 'NEW_BOOKING' ? paymentPortal.bookingData : null
+        },
+        callback: async (response) => {
+          try {
+            setIsPaying(true);
+            
+            if (paymentPortal.targetId === 'NEW_BOOKING') {
+              // Atomic Checkout Flow with verification on backend
+              await api.farmer.checkout({
+                ...paymentPortal.bookingData,
+                reference: response.reference,
+                paymentMethod: 'paystack'
+              });
+            } else {
+              // Direct Payment Flow with verification on backend
+              await api.payments.payBooking({
+                bookingId: paymentPortal.targetId,
+                amount: paymentPortal.amount,
+                method: 'paystack',
+                reference: response.reference
+              });
+            }
+            
+            // Refresh states
+            await fetchPending();
+            await fetchBookings();
+            setPaymentStep('success');
+          } catch (err) {
+            setPaymentError(err.message || "Failed to confirm payment on the server. The transaction has been recorded, please contact support if this persists.");
+          } finally {
+            setIsPaying(false);
+          }
+        },
+        onClose: () => {
+          setIsPaying(false);
+        }
+      });
+
+      handler.openIframe();
     } catch (error) {
-       setPaymentError("Please check your internet connection and try again.");
-    } finally {
-      setIsPaying(false);
+       setPaymentError(error.message || "Please check your internet connection and try again.");
+       setIsPaying(false);
     }
   };
 

@@ -13,6 +13,7 @@ import requestRoutes from './routes/request.routes.js';
 import ussdRoutes from './routes/ussd.routes.js';
 import loanRoutes from './routes/loan.routes.js';
 import aiRoutes from './routes/ai.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
 import './cron/ai.cron.js'; // Starts node-cron daily scheduler
 import { sendError } from './utils/response.js';
 
@@ -58,7 +59,11 @@ app.set('broadcastFarmerDestination', broadcastFarmerDestination);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use('/uploads', express.static('uploads'));
 
 // Routes
@@ -72,6 +77,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/ussd', ussdRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Root Route
 app.get('/', (req, res) => {
