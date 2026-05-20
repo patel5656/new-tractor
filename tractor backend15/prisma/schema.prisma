@@ -236,3 +236,66 @@ model Loan {
   @@map("loans")
 }
 
+model AiSeasonalAnalytics {
+  id              Int      @id @default(autoincrement())
+  month           String   // e.g., "January", "February", or "Harvest Season"
+  bookingCount    Int      @map("booking_count")
+  revenue         Float
+  peakDemandScore Float    @map("peak_demand_score")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_seasonal_analytics")
+}
+
+model AiRevenueTrend {
+  id               Int      @id @default(autoincrement())
+  period           String   // YYYY-MM
+  totalRevenue     Float    @map("total_revenue")
+  growthPercentage Float    @map("growth_percentage")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_revenue_trends")
+}
+
+model AiLocationAnalysis {
+  id              Int      @id @default(autoincrement())
+  locationName    String   @map("location_name")
+  latitude        Float
+  longitude       Float
+  bookingCount    Int      @map("booking_count")
+  revenue         Float
+  peakDemandScore Float    @map("peak_demand_score")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_location_analysis")
+}
+
+model AiForecastReport {
+  id                Int      @id @default(autoincrement())
+  forecastDate      DateTime @map("forecast_date")
+  predictedBookings Int      @map("predicted_bookings")
+  confidenceMin     Int      @map("confidence_min")
+  confidenceMax     Int      @map("confidence_max")
+  reason            String?  @db.Text
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_forecast_reports")
+}
+
+model AiGrowthStatistic {
+  id               Int      @id @default(autoincrement())
+  metricName       String   @map("metric_name") // e.g. "morning_vs_evening_booking_ratio"
+  metricValue      Float    @map("metric_value")
+  previousValue    Float?   @map("previous_value")
+  growthPercentage Float?   @map("growth_percentage")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_growth_statistics")
+}
+
+

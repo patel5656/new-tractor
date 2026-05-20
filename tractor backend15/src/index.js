@@ -12,6 +12,8 @@ import notificationRoutes from './routes/notification.routes.js';
 import requestRoutes from './routes/request.routes.js';
 import ussdRoutes from './routes/ussd.routes.js';
 import loanRoutes from './routes/loan.routes.js';
+import aiRoutes from './routes/ai.routes.js';
+import './cron/ai.cron.js'; // Starts node-cron daily scheduler
 import { sendError } from './utils/response.js';
 
 dotenv.config();
@@ -69,6 +71,7 @@ app.use('/api/request', requestRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/ussd', ussdRoutes);
 app.use('/api/loans', loanRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Root Route
 app.get('/', (req, res) => {

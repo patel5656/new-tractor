@@ -230,7 +230,7 @@ export const api = {
       return await fetchAPI('/admin/dashboard/active-jobs');
     },
     getDemandForecast: async () => {
-      return await fetchAPI('/admin/ai/forecast');
+      return await fetchAPI('/ai/forecast');
     },
     listBookings: async (params = {}) => {
       const query = new URLSearchParams(params).toString();
@@ -584,6 +584,26 @@ export const api = {
     },
     getHistory: async () => {
       return await fetchAPI('/loans/history');
+    }
+  },
+  ai: {
+    getForecast: async () => {
+      return await fetchAPI('/ai/forecast');
+    },
+    getSeasons: async () => {
+      return await fetchAPI('/ai/seasons');
+    },
+    getRevenue: async () => {
+      return await fetchAPI('/ai/revenue');
+    },
+    getLocationAnalysis: async () => {
+      return await fetchAPI('/ai/location-analysis');
+    },
+    getTimeAnalysis: async () => {
+      return await fetchAPI('/ai/time-analysis');
+    },
+    getHeatmap: async () => {
+      return await fetchAPI('/ai/heatmap');
     }
   }
 };
