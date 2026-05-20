@@ -26,6 +26,7 @@ export default function Payments() {
   const [paymentStep, setPaymentStep] = useState('method'); // method | bvn-verification | success
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [selectedMethod, setSelectedMethod] = useState('card'); // card | loan
   const [bvn, setBvn] = useState('');
@@ -39,6 +40,7 @@ export default function Payments() {
       setBvn('');
       setEmiMonths(3);
       setPaymentError(null);
+      setShowConfirm(false);
     }
   }, [paymentPortal.open]);
 
@@ -484,15 +486,37 @@ export default function Payments() {
 
                   {/* Action Button */}
                   {selectedMethod === 'card' ? (
-                    <Button
-                      onClick={startPayment}
-                      isLoading={isPaying}
-                      loadingText="Processing..."
-                      className="w-full h-14 bg-accent text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-accent/20 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                    >
-                      {!isPaying && <CreditCard size={18} />}
-                      Pay Now
-                    </Button>
+                    !showConfirm ? (
+                      <Button
+                        onClick={() => setShowConfirm(true)}
+                        isLoading={isPaying}
+                        loadingText="Processing..."
+                        className="w-full h-14 bg-accent text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-accent/20 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        {!isPaying && <CreditCard size={18} />}
+                        Pay Now
+                      </Button>
+                    ) : (
+                      <div className="bg-earth-card border border-accent/30 rounded-2xl p-4 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                        <p className="text-xs font-black text-earth-brown uppercase tracking-widest">Proceed with payment?</p>
+                        <div className="flex items-center gap-3">
+                          <Button
+                            onClick={() => setShowConfirm(false)}
+                            className="flex-1 h-12 bg-earth-card-alt text-earth-mut rounded-xl font-black text-[10px] uppercase tracking-widest hover:text-earth-brown transition-all"
+                          >
+                            No, Cancel
+                          </Button>
+                          <Button
+                            onClick={startPayment}
+                            isLoading={isPaying}
+                            loadingText="Processing..."
+                            className="flex-1 h-12 bg-accent text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:opacity-90 transition-all shadow-md shadow-accent/20"
+                          >
+                            Yes, Proceed
+                          </Button>
+                        </div>
+                      </div>
+                    )
                   ) : (
                     <Button
                       onClick={() => setPaymentStep('bvn-verification')}
