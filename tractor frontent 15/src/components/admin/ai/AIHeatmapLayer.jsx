@@ -45,6 +45,14 @@ export default function AIHeatmapLayer({ show = false }) {
         const center = { lat: hotspot.latitude, lng: hotspot.longitude };
         // Determine radius size relative to the peak demand score (higher score = wider hotspot area)
         const radiusVal = Math.max(5000, (hotspot.weight || 50) * 150);
+        
+        // Determine color based on intensity (Peak Score)
+        let mainColor = '#a855f7'; // Default Purple
+        if (hotspot.weight >= 85) {
+          mainColor = '#ef4444'; // Red for severe peaks
+        } else if (hotspot.weight >= 60) {
+          mainColor = '#f97316'; // Orange for moderate peaks
+        }
 
         return (
           <Fragment key={idx}>
@@ -53,10 +61,10 @@ export default function AIHeatmapLayer({ show = false }) {
               center={center}
               radius={radiusVal * 1.5}
               options={{
-                strokeColor: '#a855f7',
+                strokeColor: mainColor,
                 strokeOpacity: 0.15,
                 strokeWeight: 1,
-                fillColor: '#a855f7',
+                fillColor: mainColor,
                 fillOpacity: 0.05,
                 clickable: false
               }}
@@ -68,10 +76,10 @@ export default function AIHeatmapLayer({ show = false }) {
               radius={radiusVal}
               onClick={() => setSelectedHotspot(hotspot)}
               options={{
-                strokeColor: '#a855f7',
+                strokeColor: mainColor,
                 strokeOpacity: 0.5,
                 strokeWeight: 2,
-                fillColor: '#a855f7',
+                fillColor: mainColor,
                 fillOpacity: 0.18,
                 cursor: 'pointer'
               }}
@@ -83,7 +91,7 @@ export default function AIHeatmapLayer({ show = false }) {
               radius={radiusVal * 0.3}
               options={{
                 strokeWeight: 0,
-                fillColor: '#a855f7',
+                fillColor: mainColor,
                 fillOpacity: 0.35,
                 clickable: false
               }}
@@ -101,8 +109,8 @@ export default function AIHeatmapLayer({ show = false }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
               <div style={{
                 width: '10px', height: '10px', borderRadius: '50%',
-                backgroundColor: '#a855f7',
-                boxShadow: '0 0 0 3px rgba(168,85,247,0.3)',
+                backgroundColor: selectedHotspot.weight >= 85 ? '#ef4444' : selectedHotspot.weight >= 60 ? '#f97316' : '#a855f7',
+                boxShadow: `0 0 0 3px ${selectedHotspot.weight >= 85 ? 'rgba(239,68,68,0.3)' : selectedHotspot.weight >= 60 ? 'rgba(249,115,22,0.3)' : 'rgba(168,85,247,0.3)'}`,
               }} />
               <span style={{ fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6b7280' }}>
                 AI Predicted Hotspot

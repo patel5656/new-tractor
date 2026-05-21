@@ -406,6 +406,25 @@ export default function LiveTracking() {
             <div className="w-8 h-1 bg-emerald-500 rounded-full"></div>
             <span className="text-[10px] font-bold text-earth-brown uppercase">Active Road Route</span>
           </div>
+          
+          {showAI && (
+            <>
+              <div className="pt-2 border-t border-earth-dark/5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-purple-500/30 border border-purple-500"></div>
+                  <span className="text-[10px] font-bold text-purple-700 uppercase">AI Predicted Hotspot</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-orange-500/30 border border-orange-500"></div>
+                  <span className="text-[10px] font-bold text-orange-700 uppercase">Moderate Peak</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-red-500/30 border border-red-500 animate-pulse"></div>
+                  <span className="text-[10px] font-bold text-red-700 uppercase">Severe Peak</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

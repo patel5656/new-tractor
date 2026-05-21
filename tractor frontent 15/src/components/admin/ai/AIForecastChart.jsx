@@ -38,6 +38,24 @@ export default function AIForecastChart() {
 
   if (!data || !data.forecast) return null;
 
+  const renderCustomDot = (props) => {
+    const { cx, cy, payload } = props;
+    if (!payload || cx == null || cy == null) return null;
+    
+    // The Python AI model determines if it's a peak and writes it to the reason string
+    const isPeak = payload.reason && payload.reason.toLowerCase().includes('peak');
+    
+    if (isPeak) {
+       return (
+         <circle cx={cx} cy={cy} r={6} fill="#ef4444" stroke="#ffffff" strokeWidth={2} className="animate-pulse" key={`dot-${payload.date}`} />
+       );
+    }
+    
+    return (
+       <circle cx={cx} cy={cy} r={4} fill="#9333ea" stroke="#ffffff" strokeWidth={2} key={`dot-${payload.date}`} />
+    );
+  };
+
   return (
     <Card className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.06)] rounded-[2rem] overflow-hidden">
       <CardHeader className="border-b border-earth-dark/5 pb-5 pt-7 px-8 flex flex-row items-center justify-between">
@@ -58,6 +76,10 @@ export default function AIForecastChart() {
               <div className="flex items-center gap-2">
                  <div className="w-4 h-1.5 bg-purple-600 rounded-full shadow-[0_0_8px_rgba(147,51,234,0.5)]"></div> 
                  <span className="text-xs font-black text-earth-brown uppercase tracking-wider">AI Demand Prediction</span>
+              </div>
+              <div className="flex items-center gap-2">
+                 <div className="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse"></div> 
+                 <span className="text-xs font-black text-red-600 uppercase tracking-wider">Peak Demand</span>
               </div>
               <div className="flex items-center gap-2">
                  <div className="w-4 h-1.5 bg-gray-300 border border-dashed border-gray-400 rounded-full"></div> 
@@ -178,6 +200,8 @@ export default function AIForecastChart() {
                  fillOpacity={1} 
                  fill="url(#colorPv)" 
                  animationDuration={1500}
+                 dot={renderCustomDot}
+                 activeDot={{ r: 8, fill: '#9333ea', stroke: '#fff', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>
